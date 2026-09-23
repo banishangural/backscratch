@@ -1,4 +1,4 @@
-You are helping me build [APP_NAME]: a cross-promotion swap network for indie SaaS and web apps. Founders list their product, install a small "Tools we recommend" widget on their site, browse other verified products, and agree to swap recommendations. Both widgets then show each other's product, and a shared dashboard shows exactly what each side sent.
+You are helping me build Backscratch ([APP_NAME] below): a cross-promotion swap network for indie SaaS and web apps. Founders list their product, install a small "Tools we recommend" widget on their site, browse other verified products, and agree to swap recommendations. Both widgets then show each other's product, and a shared dashboard shows exactly what each side sent.
 
 I'm a solo developer comfortable with HTML, CSS, JavaScript, Node.js, and SQL. Work in phases. At the end of each phase, stop, summarize what you built, list how I can test it, and wait for my go-ahead before starting the next phase.
 
@@ -14,14 +14,15 @@ I'm a solo developer comfortable with HTML, CSS, JavaScript, Node.js, and SQL. W
 - Auth.js with magic-link email via Resend (AUTH_RESEND_KEY)
 - Widget: plain vanilla JavaScript/TypeScript, no framework, bundled to a single file under 10KB gzipped, served with long-lived caching
 - zod for all input validation
-- Scheduled jobs via a cron route or a simple job runner (explain your choice)
+- Scheduled jobs: protected `/api/cron/*` routes (Bearer `CRON_SECRET`), triggered hourly by a Railway cron service
+- Hosting: Railway (app + Postgres + cron) with Cloudflare CDN in front for `w.js` and widget config
 - All secrets in .env with a .env.example
 
 ## Data model (starting point; refine in Phase 0 and explain changes)
 - User
-- Product: name, URL, domain, logo, one-line pitch, category, audience description, status (pending/approved/suspended), visibility settings for each metric
+- Product: name, URL, domain, logo, one-line pitch, category, audience description, status (draft/pending/approved/rejected/suspended, with a reason shown to the founder; a rejected product can be edited and resubmitted), visibility settings for each metric
 - DomainVerification: method (meta tag or DNS TXT), token, verified_at
-- Slot: a placement of the widget on a product's site (e.g. "thank-you page", "dashboard sidebar") or a tracked link for manual placements (newsletter, social), with last_seen_at for heartbeat
+- Slot: a placement of the widget on a product's site (e.g. "thank-you page", "dashboard sidebar"), with last_seen_at for heartbeat. Widget only; there are no tracked links.
 - Swap: product_a, product_b, status (requested/active/paused/ended/declined), request message, start date, end date (default 30 days), renewal state
 - Event: type (view/click/conversion), swap, slot, source product, destination product, timestamp, daily-salted visitor hash (never raw IP)
 - MetricSnapshot: verified revenue range, active subscriptions, customer count, traffic, source (stripe/trustmrr/ga4/plausible/umami), fetched_at
@@ -40,14 +41,14 @@ Project scaffold, Prisma schema, env config, seed script with a few fake product
 
 ### Phase 2: The widget and tracked links
 - One script tag install: <script src=".../w.js" data-slot="SLOT_ID" async></script>
+- The widget heading is always "Tools we recommend". Founders cannot change it; only the app owner can, via one app-wide config value.
 - Renders up to 3 partner product cards (logo, name, one-line pitch) inside a Shadow DOM so host CSS can't break it. Light/dark/auto themes, and a compact and a card layout. It must look clean and native, never like a banner ad. Include a tiny "via [APP_NAME]" link.
 - Widget config (which partners to show) comes from a cached API endpoint; the widget must fail silently and invisibly if our API is down. Never break the host page.
 - Viewable impressions only: count a view when at least 50% of the widget is visible for 1 second (IntersectionObserver). Dedupe views per visitor hash per slot per day.
 - Clicks go through a redirect endpoint (/r/...) that records the click and forwards to the destination with UTM parameters (utm_source=[APP_NAME], utm_medium=swap, utm_campaign=<swap id>) plus a click ID parameter.
 - Heartbeat: every widget load updates the slot's last_seen_at.
-- Tracked links for manual placements: a founder can generate a link per swap for newsletters or social posts, tracked the same way.
 - Before any swaps exist, the widget shows a preview state visible only to the owner (e.g. via a query param or when logged in) so they can check placement and styling.
-- A product only appears in the marketplace after its widget has recorded real views (threshold configurable via env var).
+- Every product must install the widget to go live. A product appears in the marketplace only when: (1) it is admin-approved and its domain is verified, (2) its widget has loaded on its real site within the last 72 hours, and (3) from Phase 6 on, it has at least one verified integration (GA4, Plausible, Umami, Stripe, or TrustMRR), optionally with a minimum monthly visitor count (MARKETPLACE_MIN_MONTHLY_VISITORS).
 - Basic bot filtering: ignore known bot user agents, rate-limit event endpoints, and dedupe rapid repeated clicks.
 
 ### Phase 3: Marketplace
@@ -60,7 +61,7 @@ Project scaffold, Prisma schema, env config, seed script with a few fake product
 - Active swaps appear in both products' widgets automatically.
 - Default 30-day duration; 5 days before the end, both founders get an email to renew. A swap renews only if both agree.
 - Either side can pause or end a swap anytime, effective immediately.
-- Limits: a max number of active swaps per product (configurable), and no duplicate requests.
+- Limits: a max number of active swaps per product (configurable), and no duplicate requests (only one open swap per product pair). After a decline, the same side must wait 14 days before requesting again. If a product has more active swaps than the widget can show, the widget rotates partners.
 - Heartbeat rule: if a partner's slot hasn't been seen for 72 hours, pause the swap automatically and email both founders.
 
 ### Phase 5: Balance dashboard and conversions
@@ -96,3 +97,13 @@ Project scaffold, Prisma schema, env config, seed script with a few fake product
 - Never trust numbers sent from the client for metrics; all counts come from our own event records or verified integrations.
 - When an external API (Stripe, TrustMRR, GA4, Plausible, Umami) behaves differently than expected, read its official docs and tell me what you found. Don't guess.
 - If a requirement is ambiguous or impractical, ask me or propose an alternative rather than silently choosing.
+
+## Decisions log
+- Phase 0: widget heading fixed to "Tools we recommend" (app-wide, not founder-editable).
+- Phase 0: tracked links removed; the widget is the only placement and is required to go live.
+- Phase 0: marketplace listing rule = approved + verified domain + widget seen within 72h (+ verified integration from Phase 6).
+- Phase 0: added REJECTED (and DRAFT) product status with a reason; founders can resubmit.
+- Phase 0: users may own several products; each product has exactly one owner.
+- Phase 0: 14-day cooldown before re-requesting a declined swap.
+- Phase 0: hosting on Railway + Cloudflare CDN; hourly cron via a Railway cron service calling /api/cron/* routes.
+- Phase 0: in development only, if AUTH_RESEND_KEY is empty, magic links are printed to the server console.

@@ -1,6 +1,6 @@
 #Backscratch
 
-A cross-promotion swap network for indie SaaS and web apps. Founders list their product, install a small "Our mutuals" widget on their site, browse other verified products, and agree to swap recommendations. A shared dashboard shows exactly what each side sent.
+A cross-promotion swap network for indie SaaS and web apps. Founders list their product, install a small "Tools we recommend" widget on their site, browse other verified products, and agree to swap recommendations. A shared dashboard shows exactly what each side sent.
 
 The full product spec and phase plan live in docs/SPEC.md. Read it before starting any phase.
 
@@ -16,6 +16,9 @@ The full product spec and phase plan live in docs/SPEC.md. Read it before starti
 - Auth.js with Resend magic links
 - zod for all input validation
 - Widget: vanilla TypeScript, single bundled file, Shadow DOM
+- Prisma 7: config in prisma.config.ts, client generated to src/generated/prisma, pg driver adapter
+- Hosting: Railway (app + Postgres + hourly cron service) behind Cloudflare CDN
+- Next.js 16: read node_modules/next/dist/docs/ before writing Next.js code (see AGENTS.md)
 
 ## Security rules (non-negotiable)
 - Never read, print, log, or commit .env or any secret. Use .env.example with placeholder values.
@@ -32,4 +35,5 @@ The full product spec and phase plan live in docs/SPEC.md. Read it before starti
 - If something is ambiguous or impractical, ask me instead of choosing silently.
 
 ## Current status
-- Phase: 0 (not started)
+- Phase: 0 complete (awaiting approval for Phase 1)
+- Local dev DB: run `npm run db:setup` at the start of every cloud session (container is ephemeral).
