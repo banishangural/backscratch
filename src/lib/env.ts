@@ -14,6 +14,14 @@ const csv = z
       .filter(Boolean),
   );
 
+// Hosting dashboards often store unset values as "". Treat those as missing so defaults apply
+// (otherwise z.coerce.number() turns "" into 0).
+const int = (min: 0 | 1, fallback: number) =>
+  z.preprocess(
+    (value) => (value === "" ? undefined : value),
+    z.coerce.number().int().min(min).default(fallback),
+  );
+
 const schema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   APP_NAME: z.string().min(1).default("Backscratch"),
@@ -28,12 +36,12 @@ const schema = z.object({
   ENCRYPTION_KEY: z.string().optional(),
   CRON_SECRET: z.string().optional(),
 
-  MAX_ACTIVE_SWAPS_PER_PRODUCT: z.coerce.number().int().positive().default(5),
-  SWAP_DEFAULT_DAYS: z.coerce.number().int().positive().default(30),
-  SWAP_RENEWAL_REMINDER_DAYS: z.coerce.number().int().positive().default(5),
-  SWAP_REREQUEST_COOLDOWN_DAYS: z.coerce.number().int().nonnegative().default(14),
-  HEARTBEAT_PAUSE_HOURS: z.coerce.number().int().positive().default(72),
-  MARKETPLACE_MIN_MONTHLY_VISITORS: z.coerce.number().int().nonnegative().default(0),
+  MAX_ACTIVE_SWAPS_PER_PRODUCT: int(1, 5),
+  SWAP_DEFAULT_DAYS: int(1, 30),
+  SWAP_RENEWAL_REMINDER_DAYS: int(1, 5),
+  SWAP_REREQUEST_COOLDOWN_DAYS: int(0, 14),
+  HEARTBEAT_PAUSE_HOURS: int(1, 72),
+  MARKETPLACE_MIN_MONTHLY_VISITORS: int(0, 0),
 
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
