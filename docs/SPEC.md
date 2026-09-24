@@ -109,3 +109,8 @@ Project scaffold, Prisma schema, env config, seed script with a few fake product
 - Hosting changed to Vercel + Neon (replaces the Railway + Cloudflare entry above). Migrations run on production deploys only; hourly cron scheduler still to be decided.
 - Email testing uses Resend's `onboarding@resend.dev` sender (delivers only to the Resend account owner); a verified domain is needed before real users.
 - Phase 0: in development only, if AUTH_RESEND_KEY is empty, magic links are printed to the server console.
+- Phase 1: a domain belongs to whoever verifies it first (`Product.verifiedDomain` is unique). Unverified drafts may share a domain.
+- Phase 1: the domain must be verified before a product can be submitted for review.
+- Phase 1: editing name, URL, logo or pitch of an approved product sends it back to review; changing the domain also resets verification (back to draft).
+- Phase 1: logos are https image URLs pasted by the founder (no uploads yet).
+- Phase 1: "Check now" tries both the meta tag and the DNS TXT record; the method that succeeded is recorded.

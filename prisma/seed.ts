@@ -68,6 +68,7 @@ async function createProduct(seed: ProductSeed) {
       name: seed.name,
       url: `https://${seed.domain}`,
       domain: seed.domain,
+      verifiedDomain: seed.verified ? seed.domain : null,
       pitch: seed.pitch,
       category: seed.category,
       audience: seed.audience,
@@ -78,7 +79,7 @@ async function createProduct(seed: ProductSeed) {
       showRevenue: seed.name === "Invoicely",
       verification: {
         create: {
-          method: "META_TAG",
+          method: seed.verified ? "META_TAG" : null,
           token: `bs-verify-${randomBytes(8).toString("hex")}`,
           verifiedAt: seed.verified ? daysAgo(25) : null,
           lastCheckedAt: daysAgo(25),
