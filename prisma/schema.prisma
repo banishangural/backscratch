@@ -1,0 +1,326 @@
+// Backscratch database schema. See docs/SPEC.md for the data model rationale.
+// Connection URL lives in prisma.config.ts (Prisma 7).
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------- Auth.js (Prisma adapter) ----------
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified DateTime?
+  name          String?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts Account[]
+  sessions Session[]
+  products Product[]
+  reports  Report[]  @relation("Reporter")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ---------- Products ----------
+
+enum ProductStatus {
+  DRAFT // created, not yet submitted
+  PENDING // submitted, waiting for admin review
+  APPROVED
+  REJECTED // founder can edit and resubmit
+  SUSPENDED
+}
+
+model Product {
+  id           String        @id @default(cuid())
+  ownerId      String
+  name         String
+  url          String
+  domain       String        @unique // normalized host, e.g. "example.com"
+  logoUrl      String?
+  pitch        String // one line
+  category     String // key from the category config
+  audience     String // free-text audience description
+  status       ProductStatus @default(DRAFT)
+  statusReason String? // rejection/suspension reason shown to the founder
+  listedAt     DateTime? // set when the marketplace listing rule is met
+
+  // Which metrics the founder makes public (private by default)
+  showRevenue       Boolean @default(false)
+  showSubscriptions Boolean @default(false)
+  showCustomers     Boolean @default(false)
+  showTraffic       Boolean @default(false)
+  showSwapStats     Boolean @default(true)
+  exactRevenue      Boolean @default(false) // opt-in to exact MRR instead of a band
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner          User                @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  verification   DomainVerification?
+  slots          Slot[]
+  swapsRequested Swap[]              @relation("SwapProductA")
+  swapsReceived  Swap[]              @relation("SwapProductB")
+  eventsSent     Event[]             @relation("EventSource")
+  eventsReceived Event[]             @relation("EventDestination")
+  snapshots      MetricSnapshot[]
+  integrations   Integration[]
+  reports        Report[]
+
+  @@index([ownerId])
+  @@index([status, listedAt])
+  @@index([category])
+}
+
+enum VerificationMethod {
+  META_TAG
+  DNS_TXT
+}
+
+model DomainVerification {
+  id            String             @id @default(cuid())
+  productId     String             @unique
+  method        VerificationMethod
+  token         String             @unique
+  verifiedAt    DateTime?
+  lastCheckedAt DateTime?
+  lastError     String?
+  createdAt     DateTime           @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+// ---------- Slots (widget placements) ----------
+
+enum WidgetTheme {
+  LIGHT
+  DARK
+  AUTO
+}
+
+enum WidgetLayout {
+  COMPACT
+  CARD
+}
+
+model Slot {
+  id         String       @id @default(cuid()) // public id used in data-slot
+  productId  String
+  name       String // e.g. "Thank-you page"
+  theme      WidgetTheme  @default(AUTO)
+  layout     WidgetLayout @default(CARD)
+  lastSeenAt DateTime? // heartbeat: updated on every widget load
+  archivedAt DateTime?
+  createdAt  DateTime     @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  events  Event[]
+
+  @@index([productId])
+  @@index([lastSeenAt])
+}
+
+// ---------- Swaps ----------
+
+enum SwapStatus {
+  REQUESTED
+  ACTIVE
+  PAUSED
+  ENDED
+  DECLINED
+}
+
+enum PauseReason {
+  MANUAL
+  HEARTBEAT
+}
+
+model Swap {
+  id                String       @id @default(cuid())
+  productAId        String // requester
+  productBId        String // recipient
+  pairKey           String // sorted "idA:idB", used for duplicate checks
+  status            SwapStatus   @default(REQUESTED)
+  message           String?
+  durationDays      Int          @default(30)
+  startsAt          DateTime?
+  endsAt            DateTime?
+  respondedAt       DateTime? // accept/decline time (drives the 14-day re-request cooldown)
+  pausedAt          DateTime?
+  pauseReason       PauseReason?
+  pausedByProductId String?
+  endedAt           DateTime?
+
+  // Renewal: renews only if both sides agree
+  renewalAAgreed        Boolean   @default(false)
+  renewalBAgreed        Boolean   @default(false)
+  renewalReminderSentAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  productA Product @relation("SwapProductA", fields: [productAId], references: [id], onDelete: Cascade)
+  productB Product @relation("SwapProductB", fields: [productBId], references: [id], onDelete: Cascade)
+  events   Event[]
+
+  @@index([pairKey, status])
+  @@index([productAId, status])
+  @@index([productBId, status])
+  @@index([status, endsAt])
+}
+
+// ---------- Events (our own tracking; the only source of swap metrics) ----------
+
+enum EventType {
+  VIEW
+  CLICK
+  CONVERSION
+}
+
+model Event {
+  id                   BigInt    @id @default(autoincrement())
+  type                 EventType
+  swapId               String
+  slotId               String? // null for conversions (reported by the destination site)
+  sourceProductId      String // product whose widget sent the visitor
+  destinationProductId String // product that received the visitor
+  visitorHash          String // sha256(daily salt + ip + ua + scope); never a raw IP
+  clickId              String?   @unique // set on CLICK
+  convertedClickId     String? // set on CONVERSION
+  dedupeKey            String?   @unique // VIEW: "v:<slot>:<hash>:<day>", CONVERSION: "c:<clickId>"
+  createdAt            DateTime  @default(now())
+
+  swap        Swap    @relation(fields: [swapId], references: [id], onDelete: Cascade)
+  slot        Slot?   @relation(fields: [slotId], references: [id], onDelete: SetNull)
+  source      Product @relation("EventSource", fields: [sourceProductId], references: [id], onDelete: Cascade)
+  destination Product @relation("EventDestination", fields: [destinationProductId], references: [id], onDelete: Cascade)
+
+  @@index([swapId, type, createdAt])
+  @@index([destinationProductId, type, createdAt])
+  @@index([slotId, type, createdAt])
+}
+
+model DailySalt {
+  day       DateTime @id @db.Date
+  salt      String // random; rows older than 48h are deleted so hashes can't be reversed
+  createdAt DateTime @default(now())
+}
+
+// ---------- Verified metrics ----------
+
+enum MetricSource {
+  STRIPE
+  TRUSTMRR
+  GA4
+  PLAUSIBLE
+  UMAMI
+}
+
+model Integration {
+  id                   String       @id @default(cuid())
+  productId            String
+  provider             MetricSource
+  encryptedCredentials String       @db.Text // AES-256-GCM; never logged or sent to the client
+  config               Json? // non-secret settings, e.g. GA4 property id
+  lastSyncedAt         DateTime?
+  lastError            String?
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, provider])
+}
+
+model MetricSnapshot {
+  id                  String       @id @default(cuid())
+  productId           String
+  source              MetricSource
+  revenueBand         String? // e.g. "$1k–$5k MRR"
+  mrrCents            Int? // stored only if product.exactRevenue
+  activeSubscriptions Int?
+  customerCount       Int?
+  monthlyVisitors     Int?
+  fetchedAt           DateTime     @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, source, fetchedAt])
+}
+
+// ---------- Moderation ----------
+
+enum ReportStatus {
+  OPEN
+  DISMISSED
+  ACTIONED
+}
+
+model Report {
+  id         String       @id @default(cuid())
+  reporterId String
+  productId  String
+  reason     String
+  details    String?
+  status     ReportStatus @default(OPEN)
+  adminNote  String?
+  resolvedAt DateTime?
+  createdAt  DateTime     @default(now())
+
+  reporter User    @relation("Reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  product  Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+}
+
+// ---------- Infrastructure ----------
+
+model RateLimitBucket {
+  key         String // e.g. "events:<ipHash>"
+  windowStart DateTime
+  count       Int      @default(0)
+
+  @@id([key, windowStart])
+}
