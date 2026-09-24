@@ -74,18 +74,20 @@ enum ProductStatus {
 }
 
 model Product {
-  id           String        @id @default(cuid())
-  ownerId      String
-  name         String
-  url          String
-  domain       String        @unique // normalized host, e.g. "example.com"
-  logoUrl      String?
-  pitch        String // one line
-  category     String // key from the category config
-  audience     String // free-text audience description
-  status       ProductStatus @default(DRAFT)
-  statusReason String? // rejection/suspension reason shown to the founder
-  listedAt     DateTime? // set when the marketplace listing rule is met
+  id             String        @id @default(cuid())
+  ownerId        String
+  name           String
+  url            String
+  domain         String // normalized host, e.g. "example.com"; unverified drafts may share it
+  // Set only while the domain is verified. Unique, so one verified owner per domain.
+  verifiedDomain String?       @unique
+  logoUrl        String?
+  pitch          String // one line
+  category       String // key from the category config
+  audience       String // free-text audience description
+  status         ProductStatus @default(DRAFT)
+  statusReason   String? // rejection/suspension reason shown to the founder
+  listedAt       DateTime? // set when the marketplace listing rule is met
 
   // Which metrics the founder makes public (private by default)
   showRevenue       Boolean @default(false)
@@ -110,6 +112,7 @@ model Product {
   reports        Report[]
 
   @@index([ownerId])
+  @@index([domain])
   @@index([status, listedAt])
   @@index([category])
 }
@@ -120,14 +123,14 @@ enum VerificationMethod {
 }
 
 model DomainVerification {
-  id            String             @id @default(cuid())
-  productId     String             @unique
-  method        VerificationMethod
-  token         String             @unique
+  id            String              @id @default(cuid())
+  productId     String              @unique
+  method        VerificationMethod? // which check succeeded; "check now" tries both
+  token         String              @unique
   verifiedAt    DateTime?
   lastCheckedAt DateTime?
   lastError     String?
-  createdAt     DateTime           @default(now())
+  createdAt     DateTime            @default(now())
 
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 }

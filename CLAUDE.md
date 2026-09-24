@@ -17,7 +17,7 @@ The full product spec and phase plan live in docs/SPEC.md. Read it before starti
 - zod for all input validation
 - Widget: vanilla TypeScript, single bundled file, Shadow DOM
 - Prisma 7: config in prisma.config.ts, client generated to src/generated/prisma, pg driver adapter
-- Hosting: Vercel (app + CDN) with Neon Postgres. Production deploys run `prisma migrate deploy` automatically (scripts/vercel-build.sh); previews do not.
+- Hosting: Vercel (app + CDN) with Neon Postgres. Production and preview deploys run `prisma migrate deploy` automatically (scripts/vercel-build.sh). Previews use their own Neon branch (Neon integration: branch per Preview deployment), so they never touch the production schema.
 - Neon: app uses pooled `DATABASE_URL`; Prisma CLI uses direct `DATABASE_URL_UNPOOLED`
 - Hourly cron: scheduler not chosen yet (Vercel Hobby cron runs at most once a day). Decide with me when the first cron job is built.
 - Email: Resend. Testing uses the sender `onboarding@resend.dev`, which only delivers to the Resend account owner's email. Real users need a verified domain.
@@ -38,5 +38,5 @@ The full product spec and phase plan live in docs/SPEC.md. Read it before starti
 - If something is ambiguous or impractical, ask me instead of choosing silently.
 
 ## Current status
-- Phase: 0 complete (awaiting approval for Phase 1)
+- Phase: 1 complete (awaiting approval for Phase 2)
 - Local dev DB: run `npm run db:setup` at the start of every cloud session (container is ephemeral).

@@ -22,15 +22,19 @@ const int = (min: 0 | 1, fallback: number) =>
     z.coerce.number().int().min(min).default(fallback),
   );
 
+// Same idea for optional strings with a default.
+const text = (fallback: string) =>
+  z.preprocess((value) => (value === "" ? undefined : value), z.string().default(fallback));
+
 const schema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   APP_NAME: z.string().min(1).default("Backscratch"),
   APP_URL: z.url(),
   DATABASE_URL: z.url(),
 
-  AUTH_SECRET: z.string().optional(),
+  AUTH_SECRET: z.string().min(16),
   AUTH_RESEND_KEY: z.string().optional(),
-  EMAIL_FROM: z.string().optional(),
+  EMAIL_FROM: text("Backscratch <onboarding@resend.dev>"),
   ADMIN_EMAILS: csv,
 
   ENCRYPTION_KEY: z.string().optional(),

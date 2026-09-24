@@ -14,8 +14,11 @@ Hosting: Vercel (app + CDN) with Neon Postgres.
 
 ## Deploying (Vercel + Neon)
 
-- Vercel runs `npm run vercel-build` (`scripts/vercel-build.sh`). On **production** deploys it applies
-  pending Prisma migrations first; preview deploys skip migrations so they never change the live schema.
+- Vercel runs `npm run vercel-build` (`scripts/vercel-build.sh`). On **production** and **preview** deploys it
+  applies pending Prisma migrations first. Previews migrate their own Neon branch (the Neon integration
+  creates one per preview), never the production database. If you turn off Neon preview branching,
+  remove `preview` from the script.
+- Never edit a migration that a preview or production has already applied; add a new one instead.
 - The Neon integration provides `DATABASE_URL` (pooled, used by the app) and `DATABASE_URL_UNPOOLED`
   (direct, used by Prisma migrations).
 - Other environment variables: see `.env.example`.
@@ -51,6 +54,29 @@ Open http://localhost:3000. `http://localhost:3000/api/health` should return
 Using your own PostgreSQL instead of the script? Create a database and point `DATABASE_URL`
 in `.env` at it. The user needs `CREATEDB` so `prisma migrate dev` can make a shadow database.
 
+## Signing in and admin (Phase 1)
+
+- Go to `/login` and enter an email. In development with `AUTH_RESEND_KEY` empty, the magic link is
+  printed in the `npm run dev` terminal. Open it in the same browser.
+- Seeded users: `ana@example.com` and `ben@example.com` (founders), and the first address in `ADMIN_EMAILS`.
+- Admins are the emails in `ADMIN_EMAILS`. They see an **Admin** link in the header; everyone else gets
+  a 404 on `/admin`.
+- Sign-in emails are limited to 5 per email and 20 per IP per hour.
+
+### Product lifecycle
+
+1. **Draft**: founder creates the product and verifies the domain (meta tag or DNS TXT record, then "Check now").
+2. **In review**: founder clicks "Submit for review" (only possible once the domain is verified).
+3. Admin **approves** or **rejects with a reason**. Rejected products can be edited and resubmitted.
+4. Admin can **suspend** (with a reason) and **unsuspend** at any time.
+5. Editing name, URL, logo or pitch on an approved product sends it back to review. Changing the
+   domain resets verification (back to Draft).
+
+A domain belongs to whoever verifies it first. Unverified products may share a domain; once one is
+verified, the others can't verify or be created for it.
+
+Verification can't be tested against `localhost`: use a real site whose `<head>` or DNS you control.
+
 ## Scripts
 
 | Script | What it does |
@@ -85,8 +111,16 @@ prisma/seed.ts          fake data for local testing
 prisma.config.ts        Prisma 7 config (DB URL, migrations, seed command)
 scripts/setup-dev-db.sh local PostgreSQL setup
 src/app/                Next.js routes (pages + API)
+src/auth.ts             Auth.js config (magic links, database sessions)
+src/components/         UI components
 src/lib/env.ts          validated environment variables
 src/lib/db.ts           shared Prisma client
+src/lib/session.ts      requireUser() / requireAdmin() helpers
+src/lib/products/       product validation (zod) and founder server actions
+src/lib/admin/          admin moderation actions
+src/lib/verification.ts domain ownership checks (meta tag, DNS TXT)
+src/lib/safe-fetch.ts   fetches founder sites safely (blocks private IPs)
+src/lib/rate-limit.ts   database-backed rate limiter
 src/config/             editable app config (categories)
 src/generated/prisma/   generated Prisma client (git-ignored)
 widget/                 embeddable widget (Phase 2)
