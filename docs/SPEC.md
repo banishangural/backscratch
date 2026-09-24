@@ -115,3 +115,10 @@ Project scaffold, Prisma schema, env config, seed script with a few fake product
 - Phase 1: logos are https image URLs pasted by the founder (no uploads yet).
 - Phase 1: "Check now" tries both the meta tag and the DNS TXT record; the method that succeeded is recorded.
 - Preview deploys now run migrations too, against their own Neon branch (Neon integration creates a branch per Preview deployment). Production still migrates on deploy.
+- Phase 2: a widget load counts toward going live only on the product's verified domain or its subdomains (localhost too, in development). Views and clicks from other hosts aren't counted.
+- Phase 2: owner preview uses a signed, slot-bound token valid for 1 hour (in the page URL as `#bs-preview=…`), plus an in-app preview page. Preview shows sample cards and records nothing.
+- Phase 2: old daily salts are deleted when the next day's salt is created (no cron needed). Unlisting is a query-time check (`liveProductWhere`), so no cron yet; the scheduler is chosen in Phase 4.
+- Phase 2: the widget renders nothing until its config arrives. Founders are told to place it below the fold or in a sidebar; a reserved-height option can come in Phase 7.
+- Phase 2: widget endpoints use the existing Postgres-backed rate limiter; revisit (e.g. Redis) only if traffic needs it.
+- Phase 2: views are deduped per visitor, slot, swap, and day (one VIEW row per swap shown). A product with more than 3 active swaps shows a random 3 per 60-second cache window.
+- Phase 2: `Slot.lastSeenHost` added (host of the last counted widget load, shown to the founder).

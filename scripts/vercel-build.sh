@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Vercel build: apply pending Prisma migrations, then build the app.
+# Vercel build: apply pending Prisma migrations, then build the widget and the app.
 # Vercel runs `npm run vercel-build` instead of `npm run build` when that script exists.
 #
 # Production: migrates the production database.
@@ -20,4 +20,5 @@ case "${VERCEL_ENV:-}" in
 esac
 
 npx prisma generate
+node widget/build.mjs # public/w.js, fails the build if over 10KB gzipped
 npx next build

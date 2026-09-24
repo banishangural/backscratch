@@ -14,6 +14,8 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Generated Prisma client
     "src/generated/**",
+    // Built widget bundle (source is widget/src)
+    "public/w.js",
   ]),
 ]);
 

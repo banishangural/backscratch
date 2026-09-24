@@ -38,5 +38,5 @@ The full product spec and phase plan live in docs/SPEC.md. Read it before starti
 - If something is ambiguous or impractical, ask me instead of choosing silently.
 
 ## Current status
-- Phase: 1 complete (awaiting approval for Phase 2)
+- Phase: 2 complete (awaiting approval for Phase 3)
 - Local dev DB: run `npm run db:setup` at the start of every cloud session (container is ephemeral).

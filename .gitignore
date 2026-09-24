@@ -147,3 +147,4 @@ next-env.d.ts
 
 # Generated Prisma client
 /src/generated/
+/public/w.js

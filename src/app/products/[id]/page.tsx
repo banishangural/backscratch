@@ -1,19 +1,23 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CATEGORIES } from "@/config/categories";
+import { GoLiveChecklist } from "@/components/go-live-checklist";
 import { ProductLogo } from "@/components/product-logo";
+import { SlotList } from "@/components/slot-list";
 import { StatusBadge } from "@/components/status-badge";
 import { SubmitForReview } from "@/components/submit-for-review";
 import { VerificationPanel } from "@/components/verification-panel";
 import type { ProductStatus } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
+import { env } from "@/lib/env";
 import { requireUser } from "@/lib/session";
 import { metaTagFor, txtRecordFor } from "@/lib/verification";
+import { goLiveChecks } from "@/lib/widget/go-live";
 
 const STATUS_HELP: Record<ProductStatus, string> = {
   DRAFT: "Verify your domain, then submit your product for review.",
   PENDING: "We're reviewing your product. You'll see the result here.",
-  APPROVED: "Approved. Your product goes live in the marketplace once the widget is installed on your site.",
+  APPROVED: "Approved. Your product goes live in the marketplace once the widget is installed on your site (see below).",
   REJECTED: "Your product wasn't approved. Fix the issue below, then resubmit.",
   SUSPENDED: "Your product is suspended and hidden from the marketplace. Contact us if you think this is a mistake.",
 };
@@ -23,7 +27,10 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
   const { id } = await params;
   const product = await db.product.findFirst({
     where: { id, ownerId: user.id },
-    include: { verification: true },
+    include: {
+      verification: true,
+      slots: { where: { archivedAt: null }, orderBy: { createdAt: "asc" } },
+    },
   });
   if (!product?.verification) notFound();
 
@@ -67,6 +74,20 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
             label={product.status === "REJECTED" ? "Resubmit for review" : "Submit for review"}
           />
         )}
+      </Section>
+
+      <Section title="Go live">
+        <GoLiveChecklist checks={goLiveChecks(product)} domain={product.domain} />
+      </Section>
+
+      <Section title="Widget">
+        <SlotList
+          productId={product.id}
+          productUrl={product.url}
+          domain={product.domain}
+          appUrl={env.APP_URL.replace(/\/$/, "")}
+          slots={product.slots}
+        />
       </Section>
 
       <Section title="Domain ownership">
