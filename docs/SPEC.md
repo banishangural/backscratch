@@ -14,8 +14,8 @@ I'm a solo developer comfortable with HTML, CSS, JavaScript, Node.js, and SQL. W
 - Auth.js with magic-link email via Resend (AUTH_RESEND_KEY)
 - Widget: plain vanilla JavaScript/TypeScript, no framework, bundled to a single file under 10KB gzipped, served with long-lived caching
 - zod for all input validation
-- Scheduled jobs: protected `/api/cron/*` routes (Bearer `CRON_SECRET`), triggered hourly by a Railway cron service
-- Hosting: Railway (app + Postgres + cron) with Cloudflare CDN in front for `w.js` and widget config
+- Scheduled jobs: protected `/api/cron/*` routes (Bearer `CRON_SECRET`), triggered hourly by a scheduler (to be chosen; Vercel Hobby cron runs at most daily)
+- Hosting: Vercel (app, with Vercel's CDN caching `w.js` and widget config) + Neon Postgres. Production deploys apply Prisma migrations automatically
 - All secrets in .env with a .env.example
 
 ## Data model (starting point; refine in Phase 0 and explain changes)
@@ -106,4 +106,6 @@ Project scaffold, Prisma schema, env config, seed script with a few fake product
 - Phase 0: users may own several products; each product has exactly one owner.
 - Phase 0: 14-day cooldown before re-requesting a declined swap.
 - Phase 0: hosting on Railway + Cloudflare CDN; hourly cron via a Railway cron service calling /api/cron/* routes.
+- Hosting changed to Vercel + Neon (replaces the Railway + Cloudflare entry above). Migrations run on production deploys only; hourly cron scheduler still to be decided.
+- Email testing uses Resend's `onboarding@resend.dev` sender (delivers only to the Resend account owner); a verified domain is needed before real users.
 - Phase 0: in development only, if AUTH_RESEND_KEY is empty, magic links are printed to the server console.

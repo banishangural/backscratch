@@ -10,7 +10,17 @@ dashboard shows the traffic each side sent.
 ## Stack
 
 Next.js 16 (App Router) · TypeScript · Tailwind CSS 4 · PostgreSQL · Prisma 7 · Auth.js · zod.
-Hosting target: Railway (app + Postgres + cron) behind Cloudflare.
+Hosting: Vercel (app + CDN) with Neon Postgres.
+
+## Deploying (Vercel + Neon)
+
+- Vercel runs `npm run vercel-build` (`scripts/vercel-build.sh`). On **production** deploys it applies
+  pending Prisma migrations first; preview deploys skip migrations so they never change the live schema.
+- The Neon integration provides `DATABASE_URL` (pooled, used by the app) and `DATABASE_URL_UNPOOLED`
+  (direct, used by Prisma migrations).
+- Other environment variables: see `.env.example`.
+- Email testing: set `EMAIL_FROM="Backscratch <onboarding@resend.dev>"`. Resend only delivers from this
+  test sender to your own Resend account email. Verify a domain before inviting real users.
 
 ## Local setup
 

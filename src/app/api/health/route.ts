@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 
-// Liveness + database check. Used by Railway health checks and local setup testing.
+// Liveness + database check. Used by uptime/health checks and local setup testing.
 export async function GET() {
   try {
     await db.$queryRaw`SELECT 1`;
