@@ -14,8 +14,11 @@ Hosting: Vercel (app + CDN) with Neon Postgres.
 
 ## Deploying (Vercel + Neon)
 
-- Vercel runs `npm run vercel-build` (`scripts/vercel-build.sh`). On **production** deploys it applies
-  pending Prisma migrations first; preview deploys skip migrations so they never change the live schema.
+- Vercel runs `npm run vercel-build` (`scripts/vercel-build.sh`). On **production** and **preview** deploys it
+  applies pending Prisma migrations first. Previews migrate their own Neon branch (the Neon integration
+  creates one per preview), never the production database. If you turn off Neon preview branching,
+  remove `preview` from the script.
+- Never edit a migration that a preview or production has already applied; add a new one instead.
 - The Neon integration provides `DATABASE_URL` (pooled, used by the app) and `DATABASE_URL_UNPOOLED`
   (direct, used by Prisma migrations).
 - Other environment variables: see `.env.example`.

@@ -114,3 +114,4 @@ Project scaffold, Prisma schema, env config, seed script with a few fake product
 - Phase 1: editing name, URL, logo or pitch of an approved product sends it back to review; changing the domain also resets verification (back to draft).
 - Phase 1: logos are https image URLs pasted by the founder (no uploads yet).
 - Phase 1: "Check now" tries both the meta tag and the DNS TXT record; the method that succeeded is recorded.
+- Preview deploys now run migrations too, against their own Neon branch (Neon integration creates a branch per Preview deployment). Production still migrates on deploy.
