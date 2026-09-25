@@ -89,6 +89,7 @@ async function createProduct(seed: ProductSeed) {
         create: {
           name: "Thank-you page",
           lastSeenAt: seed.lastSeenHoursAgo === undefined ? null : hoursAgo(seed.lastSeenHoursAgo),
+          lastSeenHost: seed.lastSeenHoursAgo === undefined ? null : seed.domain,
         },
       },
     },
@@ -235,7 +236,7 @@ async function createEvents(swapId: string, a: SeededProduct, b: SeededProduct) 
         const visitorHash = fakeHash(`${dayKey}:${source.id}:${v}`);
         const at = new Date(daysAgo(day).getTime() - randomInt(0, 20) * 60 * 60 * 1000);
         const base = { swapId, sourceProductId: source.id, destinationProductId: destination.id, visitorHash };
-        events.push({ ...base, type: "VIEW", slotId, dedupeKey: `v:${slotId}:${visitorHash}:${dayKey}`, createdAt: at });
+        events.push({ ...base, type: "VIEW", slotId, dedupeKey: `v:${slotId}:${swapId}:${visitorHash}:${dayKey}`, createdAt: at });
 
         if (random() < 0.04) {
           const clickId = randomBytes(10).toString("hex");

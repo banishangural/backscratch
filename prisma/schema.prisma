@@ -149,14 +149,15 @@ enum WidgetLayout {
 }
 
 model Slot {
-  id         String       @id @default(cuid()) // public id used in data-slot
-  productId  String
-  name       String // e.g. "Thank-you page"
-  theme      WidgetTheme  @default(AUTO)
-  layout     WidgetLayout @default(CARD)
-  lastSeenAt DateTime? // heartbeat: updated on every widget load
-  archivedAt DateTime?
-  createdAt  DateTime     @default(now())
+  id           String       @id @default(cuid()) // public id used in data-slot
+  productId    String
+  name         String // e.g. "Thank-you page"
+  theme        WidgetTheme  @default(AUTO)
+  layout       WidgetLayout @default(CARD)
+  lastSeenAt   DateTime? // heartbeat: updated when the widget loads on the product's own domain
+  lastSeenHost String? // host of the page where it last loaded, e.g. "app.example.com"
+  archivedAt   DateTime?
+  createdAt    DateTime     @default(now())
 
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   events  Event[]
@@ -232,7 +233,7 @@ model Event {
   visitorHash          String // sha256(daily salt + ip + ua + scope); never a raw IP
   clickId              String?   @unique // set on CLICK
   convertedClickId     String? // set on CONVERSION
-  dedupeKey            String?   @unique // VIEW: "v:<slot>:<hash>:<day>", CONVERSION: "c:<clickId>"
+  dedupeKey            String?   @unique // VIEW: "v:<slot>:<swap>:<hash>:<day>", CONVERSION: "c:<clickId>"
   createdAt            DateTime  @default(now())
 
   swap        Swap    @relation(fields: [swapId], references: [id], onDelete: Cascade)

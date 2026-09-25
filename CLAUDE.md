@@ -6,7 +6,7 @@ The full product spec and phase plan live in docs/SPEC.md. Read it before starti
 
 ## Core principles
 - Founders choose their own partners. No credit or points system. Fairness comes from transparent two-way traffic numbers.
-- The widget must be tiny (<10KB gzipped), fast, never break or slow the host page, and look native, not like an ad.
+- The widget must be tiny (<10KB gzipped), fast, never break or slow the host page, and stay tasteful and unobtrusive: clean cards, one partner at a time in the corner badge, easy to minimize, never covering content or the host's buttons.
 - Metrics come only from our own event records or verified integrations. Never trust client-sent numbers.
 - Privacy: no third-party cookies, no fingerprinting, no raw IPs stored (daily-salted hashes only).
 
@@ -38,5 +38,5 @@ The full product spec and phase plan live in docs/SPEC.md. Read it before starti
 - If something is ambiguous or impractical, ask me instead of choosing silently.
 
 ## Current status
-- Phase: 1 complete (awaiting approval for Phase 2)
+- Phase: 2 complete; next is Phase 2.1 (placement rework), awaiting approval
 - Local dev DB: run `npm run db:setup` at the start of every cloud session (container is ephemeral).
