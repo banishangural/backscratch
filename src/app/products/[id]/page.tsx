@@ -2,22 +2,24 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CATEGORIES } from "@/config/categories";
 import { GoLiveChecklist } from "@/components/go-live-checklist";
+import { PathBreakdown } from "@/components/path-breakdown";
 import { ProductLogo } from "@/components/product-logo";
-import { SlotList } from "@/components/slot-list";
 import { StatusBadge } from "@/components/status-badge";
 import { SubmitForReview } from "@/components/submit-for-review";
 import { VerificationPanel } from "@/components/verification-panel";
+import { WidgetPanel } from "@/components/widget-panel";
 import type { ProductStatus } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
 import { requireUser } from "@/lib/session";
 import { metaTagFor, txtRecordFor } from "@/lib/verification";
-import { goLiveChecks } from "@/lib/widget/go-live";
+import { goLiveChecks, recentBandPages } from "@/lib/widget/go-live";
+import { viewPathBreakdown } from "@/lib/widget/path-stats";
 
 const STATUS_HELP: Record<ProductStatus, string> = {
   DRAFT: "Verify your domain, then submit your product for review.",
   PENDING: "We're reviewing your product. You'll see the result here.",
-  APPROVED: "Approved. Your product goes live in the marketplace once the widget is installed on your site (see below).",
+  APPROVED: "Approved. Your product goes live in the marketplace once the widget is installed site-wide (see below).",
   REJECTED: "Your product wasn't approved. Fix the issue below, then resubmit.",
   SUSPENDED: "Your product is suspended and hidden from the marketplace. Contact us if you think this is a mistake.",
 };
@@ -29,10 +31,10 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
     where: { id, ownerId: user.id },
     include: {
       verification: true,
-      slots: { where: { archivedAt: null }, orderBy: { createdAt: "asc" } },
+      slot: true,
     },
   });
-  if (!product?.verification) notFound();
+  if (!product?.verification || !product.slot) notFound();
 
   const { verification } = product;
   const verified = Boolean(verification.verifiedAt) && product.verifiedDomain === product.domain;
@@ -40,6 +42,7 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
     !verified &&
     (await db.product.count({ where: { verifiedDomain: product.domain, id: { not: product.id } } })) > 0;
   const canSubmit = product.status === "DRAFT" || product.status === "REJECTED";
+  const [bandPages, breakdown] = await Promise.all([recentBandPages(product.slot.id), viewPathBreakdown(product.id)]);
   const category = CATEGORIES.find((c) => c.key === product.category)?.label ?? product.category;
 
   return (
@@ -81,13 +84,11 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
       </Section>
 
       <Section title="Widget">
-        <SlotList
-          productId={product.id}
-          productUrl={product.url}
-          domain={product.domain}
-          appUrl={env.APP_URL.replace(/\/$/, "")}
-          slots={product.slots}
-        />
+        <WidgetPanel product={product} slot={product.slot} bandPages={bandPages} appUrl={env.APP_URL.replace(/\/$/, "")} />
+      </Section>
+
+      <Section title="Where your widget is seen">
+        <PathBreakdown breakdown={breakdown} />
       </Section>
 
       <Section title="Domain ownership">

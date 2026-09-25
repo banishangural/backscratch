@@ -97,12 +97,16 @@ model Product {
   showSwapStats     Boolean @default(true)
   exactRevenue      Boolean @default(false) // opt-in to exact MRR instead of a band
 
+  // Placements offered: the footer band always; the corner badge only if ticked.
+  offersBadge Boolean     @default(false)
+  badgeCorner BadgeCorner @default(RIGHT)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   owner          User                @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   verification   DomainVerification?
-  slots          Slot[]
+  slot           Slot?
   swapsRequested Swap[]              @relation("SwapProductA")
   swapsReceived  Swap[]              @relation("SwapProductB")
   eventsSent     Event[]             @relation("EventSource")
@@ -135,7 +139,7 @@ model DomainVerification {
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 }
 
-// ---------- Slots (widget placements) ----------
+// ---------- Slot (the product's widget install) ----------
 
 enum WidgetTheme {
   LIGHT
@@ -145,25 +149,55 @@ enum WidgetTheme {
 
 enum WidgetLayout {
   COMPACT
-  CARD
+  CARD // stacked cards
+  ROW // cards side by side, wrapping on small screens
 }
 
+enum Placement {
+  BAND // "Tools we recommend" band above the site footer (required)
+  BADGE // corner badge, one partner at a time (optional)
+}
+
+enum BadgeCorner {
+  LEFT
+  RIGHT
+}
+
+// One per product, created with it. One script tag renders the band and, if offered, the badge.
+// Heartbeat fields: updated when the widget loads on the product's own domain.
 model Slot {
-  id           String       @id @default(cuid()) // public id used in data-slot
-  productId    String
-  name         String // e.g. "Thank-you page"
-  theme        WidgetTheme  @default(AUTO)
-  layout       WidgetLayout @default(CARD)
-  lastSeenAt   DateTime? // heartbeat: updated when the widget loads on the product's own domain
-  lastSeenHost String? // host of the page where it last loaded, e.g. "app.example.com"
-  archivedAt   DateTime?
-  createdAt    DateTime     @default(now())
+  id                String       @id @default(cuid()) // public id used in data-slot
+  productId         String       @unique
+  theme             WidgetTheme  @default(AUTO)
+  layout            WidgetLayout @default(ROW) // band layout
+  bandLastSeenAt    DateTime?
+  bandLastSeenHost  String? // e.g. "app.example.com"
+  // Last time the band was seen on enough distinct pages (MIN_BAND_PAGES within the live window).
+  bandSpreadAt      DateTime?
+  badgeLastSeenAt   DateTime? // widget loaded while the badge was offered
+  badgeLastSeenHost String?
+  createdAt         DateTime     @default(now())
 
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
   events  Event[]
+  pages   PlacementPage[]
 
-  @@index([productId])
-  @@index([lastSeenAt])
+  @@index([bandSpreadAt])
+  @@index([badgeLastSeenAt])
+}
+
+// Per-placement, per-page heartbeat: where the widget has loaded recently.
+model PlacementPage {
+  slotId     String
+  placement  Placement
+  path       String // normalized: no query or fragment, ID-like segments become ":id"
+  host       String
+  lastSeenAt DateTime
+
+  slot Slot @relation(fields: [slotId], references: [id], onDelete: Cascade)
+
+  @@id([slotId, placement, path])
+  @@index([slotId, placement, lastSeenAt])
 }
 
 // ---------- Swaps ----------
@@ -228,12 +262,14 @@ model Event {
   type                 EventType
   swapId               String
   slotId               String? // null for conversions (reported by the destination site)
+  placement            Placement? // VIEW and CLICK only
+  pagePath             String? // VIEW and CLICK only; normalized like PlacementPage.path
   sourceProductId      String // product whose widget sent the visitor
   destinationProductId String // product that received the visitor
   visitorHash          String // sha256(daily salt + ip + ua + scope); never a raw IP
   clickId              String?   @unique // set on CLICK
   convertedClickId     String? // set on CONVERSION
-  dedupeKey            String?   @unique // VIEW: "v:<slot>:<swap>:<hash>:<day>", CONVERSION: "c:<clickId>"
+  dedupeKey            String?   @unique // VIEW: "v:<slot>:<b|g (band|badge)>:<swap>:<hash>:<day>", CONVERSION: "c:<clickId>"
   createdAt            DateTime  @default(now())
 
   swap        Swap    @relation(fields: [swapId], references: [id], onDelete: Cascade)
@@ -243,6 +279,7 @@ model Event {
 
   @@index([swapId, type, createdAt])
   @@index([destinationProductId, type, createdAt])
+  @@index([sourceProductId, type, createdAt])
   @@index([slotId, type, createdAt])
 }
 

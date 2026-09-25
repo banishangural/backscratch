@@ -1,15 +1,19 @@
 import { randomBytes } from "node:crypto";
 import { CLICK_DEDUPE_SECONDS, CLICK_ID_PARAM, UTM_MEDIUM, UTM_SOURCE } from "@/config/widget";
+import type { Placement } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
 import { clientIpHash, rateLimit } from "@/lib/rate-limit";
 import { isProductHost } from "@/lib/widget/go-live";
+import { badgeSelect, normalizePath, parsePlacement, swapPlacements } from "@/lib/widget/placements";
 import { NO_STORE, publicId } from "@/lib/widget/request";
 import { isBot, visitorHash } from "@/lib/widget/visitor";
 
 // Click on a partner card. Records the click, then forwards the visitor to the partner with
 // UTM parameters and a click id. The destination always comes from the database, never the URL.
 // Visitors are always forwarded; bots, repeat clicks, and rate-limited clicks just aren't counted.
+// The widget adds ?pl=band|badge&p=<page path>: browsers send only the origin as the Referer
+// to other sites, so the path has to come from the widget. Both are labels, never counts.
 
 export async function GET(request: Request, ctx: RouteContext<"/r/[swapId]/[slotId]">) {
   const { swapId, slotId } = await ctx.params;
@@ -22,13 +26,13 @@ export async function GET(request: Request, ctx: RouteContext<"/r/[swapId]/[slot
         status: true,
         productAId: true,
         productBId: true,
-        productA: { select: { url: true, status: true } },
-        productB: { select: { url: true, status: true } },
+        productA: { select: { url: true, status: true, ...badgeSelect } },
+        productB: { select: { url: true, status: true, ...badgeSelect } },
       },
     }),
     db.slot.findUnique({
       where: { id: slotId },
-      select: { productId: true, archivedAt: true, product: { select: { verifiedDomain: true } } },
+      select: { productId: true, product: { select: { verifiedDomain: true } } },
     }),
   ]);
 
@@ -44,10 +48,17 @@ export async function GET(request: Request, ctx: RouteContext<"/r/[swapId]/[slot
   target.searchParams.set("utm_medium", UTM_MEDIUM);
   target.searchParams.set("utm_campaign", swapId);
 
-  if (swap.status === "ACTIVE" && !slot.archivedAt && (await countable(request, slot.product.verifiedDomain))) {
+  const { searchParams } = new URL(request.url);
+  const placement = parsePlacement(searchParams.get("pl"));
+  // Like views: a badge click counts only while the swap runs on the badge.
+  const runsOn = swapPlacements(swap.productA, swap.productB).includes(placement);
+
+  if (swap.status === "ACTIVE" && runsOn && (await countable(request, slot.product.verifiedDomain))) {
     const clickId = await recordClick(request, {
       swapId,
       slotId,
+      placement,
+      pagePath: normalizePath(searchParams.get("p")),
       sourceProductId: source,
       destinationProductId: toB ? swap.productBId : swap.productAId,
     });
@@ -64,7 +75,14 @@ async function countable(request: Request, verifiedDomain: string | null) {
   return rateLimit(`widget-click:${await clientIpHash()}`, 30, 60);
 }
 
-type ClickData = { swapId: string; slotId: string; sourceProductId: string; destinationProductId: string };
+type ClickData = {
+  swapId: string;
+  slotId: string;
+  placement: Placement;
+  pagePath: string;
+  sourceProductId: string;
+  destinationProductId: string;
+};
 
 async function recordClick(request: Request, data: ClickData) {
   const hash = await visitorHash(request, data.slotId);

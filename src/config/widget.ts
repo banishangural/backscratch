@@ -3,14 +3,28 @@
 // The heading shown above partner cards on every widget.
 export const WIDGET_HEADING = "Tools we recommend";
 
-// Most partner cards one widget shows. Products with more active swaps rotate.
+// Most partner cards the footer band shows. Products with more active swaps rotate.
 export const MAX_WIDGET_CARDS = 3;
+
+// Most partners the corner badge rotates through (it shows one per page view).
+export const MAX_BADGE_CARDS = 10;
 
 // How long browsers and Vercel's CDN may cache a slot's widget config.
 export const WIDGET_CONFIG_CACHE_SECONDS = 60;
 
-// A product is live only if its widget loaded on its own domain within this window.
+// A product is live only if its band loaded on its own domain within this window. An offered
+// placement not seen within it counts as not offered (swaps fall back to the band).
 export const LIVE_WINDOW_HOURS = 72;
+
+// Going live needs the band on at least this many distinct pages within the live window:
+// a sign it's in the site-wide layout rather than on one hidden page.
+export const MIN_BAND_PAGES = 3;
+
+// Distinct page paths remembered per placement; new paths beyond this aren't recorded.
+export const MAX_TRACKED_PATHS = 200;
+
+// Page paths not seen for this long are forgotten.
+export const PAGE_PATH_RETENTION_DAYS = 7;
 
 // Heartbeats update Slot.lastSeenAt at most this often, to keep database writes low.
 export const HEARTBEAT_WRITE_INTERVAL_MINUTES = 5;
@@ -22,9 +36,6 @@ export const CLICK_DEDUPE_SECONDS = 30;
 export const UTM_SOURCE = "backscratch";
 export const UTM_MEDIUM = "swap";
 export const CLICK_ID_PARAM = "bs_click";
-
-// Placements per product (archived ones don't count).
-export const MAX_SLOTS_PER_PRODUCT = 10;
 
 // Shown in the owner-only preview before any swaps exist.
 export const PREVIEW_CARDS = [

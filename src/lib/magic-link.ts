@@ -1,5 +1,6 @@
 import "server-only";
 import type { EmailConfig } from "next-auth/providers";
+import { sendEmail } from "@/lib/email";
 import { env } from "@/lib/env";
 import { hashForKey, rateLimit } from "@/lib/rate-limit";
 
@@ -15,27 +16,17 @@ export async function sendMagicLink({ identifier: email, url, request }: Params)
   ]);
   if (!emailOk || !ipOk) throw new Error("Too many sign-in emails requested.");
 
-  if (!env.AUTH_RESEND_KEY) {
-    if (env.NODE_ENV !== "development") throw new Error("AUTH_RESEND_KEY is not set.");
+  if (!env.AUTH_RESEND_KEY && env.NODE_ENV === "development") {
     console.log(`\n[dev] Magic link for ${email}:\n${url}\n`);
     return;
   }
 
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${env.AUTH_RESEND_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from: env.EMAIL_FROM,
-      to: email,
-      subject: `Your ${env.APP_NAME} sign-in link`,
-      text: `Sign in to ${env.APP_NAME}:\n${url}\n\nThe link expires in 30 minutes. If you didn't ask for it, ignore this email.`,
-      html: emailHtml(url),
-    }),
+  await sendEmail({
+    to: email,
+    subject: `Your ${env.APP_NAME} sign-in link`,
+    text: `Sign in to ${env.APP_NAME}:\n${url}\n\nThe link expires in 30 minutes. If you didn't ask for it, ignore this email.`,
+    html: emailHtml(url),
   });
-  if (!res.ok) throw new Error(`Resend responded with ${res.status}.`);
 }
 
 function emailHtml(url: string) {

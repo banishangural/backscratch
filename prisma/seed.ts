@@ -57,8 +57,12 @@ type ProductSeed = {
   status: Prisma.ProductCreateInput["status"];
   statusReason?: string;
   verified: boolean;
-  lastSeenHoursAgo?: number;
+  lastSeenHoursAgo?: number; // when the widget last loaded on the product's site
+  offersBadge?: boolean;
 };
+
+// Pages where seeded widgets have loaded (enough distinct pages to go live).
+const SEEN_PATHS = ["/", "/pricing", "/blog", "/blog/:id"];
 
 async function createProduct(seed: ProductSeed) {
   const listed = seed.status === "APPROVED" && seed.verified && (seed.lastSeenHoursAgo ?? 999) < 72;
@@ -85,16 +89,25 @@ async function createProduct(seed: ProductSeed) {
           lastCheckedAt: daysAgo(25),
         },
       },
-      slots: {
-        create: {
-          name: "Thank-you page",
-          lastSeenAt: seed.lastSeenHoursAgo === undefined ? null : hoursAgo(seed.lastSeenHoursAgo),
-          lastSeenHost: seed.lastSeenHoursAgo === undefined ? null : seed.domain,
-        },
-      },
+      offersBadge: seed.offersBadge ?? false,
+      slot: { create: slotData(seed) },
     },
-    include: { slots: true },
+    include: { slot: true },
   });
+}
+
+function slotData(seed: ProductSeed): Prisma.SlotCreateWithoutProductInput {
+  if (seed.lastSeenHoursAgo === undefined) return {};
+  const seenAt = hoursAgo(seed.lastSeenHoursAgo);
+  const pages: Prisma.PlacementPageCreateWithoutSlotInput[] = SEEN_PATHS.map((path) => ({ placement: "BAND", path, host: seed.domain, lastSeenAt: seenAt }));
+  if (seed.offersBadge) pages.push(...pages.map((page) => ({ ...page, placement: "BADGE" as const })));
+  return {
+    bandLastSeenAt: seenAt,
+    bandLastSeenHost: seed.domain,
+    bandSpreadAt: seenAt,
+    ...(seed.offersBadge && { badgeLastSeenAt: seenAt, badgeLastSeenHost: seed.domain }),
+    pages: { create: pages },
+  };
 }
 
 async function createProducts(owners: { ana: string; ben: string }) {
@@ -108,6 +121,7 @@ async function createProducts(owners: { ana: string; ben: string }) {
     status: "APPROVED",
     verified: true,
     lastSeenHoursAgo: 1,
+    offersBadge: true,
   });
   const formForge = await createProduct({
     ownerId: owners.ana,
@@ -130,6 +144,7 @@ async function createProducts(owners: { ana: string; ben: string }) {
     status: "APPROVED",
     verified: true,
     lastSeenHoursAgo: 3,
+    offersBadge: true,
   });
   const chartNest = await createProduct({
     ownerId: owners.ben,
@@ -202,7 +217,7 @@ async function createSwaps(p: Awaited<ReturnType<typeof createProducts>>) {
   });
   await swap(p.formForge, p.mailPilot, {
     status: "REQUESTED",
-    message: "Hi Ben, would love to recommend MailPilot on our thank-you page.",
+    message: "Hi Ben, would love to recommend MailPilot on our site.",
   });
   await swap(p.chartNest, p.invoicely, {
     status: "ENDED",
@@ -219,6 +234,9 @@ async function createSwaps(p: Awaited<ReturnType<typeof createProducts>>) {
   return active;
 }
 
+// Page paths for seeded events: "/blog" most often, then "/", then the rest.
+const PATH_WEIGHTS = ["/blog", "/blog", "/blog", "/blog/:id", "/blog/:id", "/", "/", "/pricing"];
+
 // ~14 days of views, clicks, and conversions in both directions of one active swap.
 async function createEvents(swapId: string, a: SeededProduct, b: SeededProduct) {
   const events: Prisma.EventCreateManyInput[] = [];
@@ -230,17 +248,21 @@ async function createEvents(swapId: string, a: SeededProduct, b: SeededProduct) 
   for (let day = 13; day >= 0; day--) {
     const dayKey = daysAgo(day).toISOString().slice(0, 10);
     for (const { source, destination, dailyViews } of directions) {
-      const slotId = source.slots[0].id;
+      const slotId = source.slot!.id;
       const views = randomInt(dailyViews[0], dailyViews[1]);
       for (let v = 0; v < views; v++) {
         const visitorHash = fakeHash(`${dayKey}:${source.id}:${v}`);
         const at = new Date(daysAgo(day).getTime() - randomInt(0, 20) * 60 * 60 * 1000);
+        // Both products offer the badge, so the swap runs on the band and the badge.
+        const placement = random() < 0.6 ? ("BAND" as const) : ("BADGE" as const);
+        const pagePath = PATH_WEIGHTS[randomInt(0, PATH_WEIGHTS.length - 1)];
         const base = { swapId, sourceProductId: source.id, destinationProductId: destination.id, visitorHash };
-        events.push({ ...base, type: "VIEW", slotId, dedupeKey: `v:${slotId}:${swapId}:${visitorHash}:${dayKey}`, createdAt: at });
+        const tag = placement === "BADGE" ? "g" : "b";
+        events.push({ ...base, type: "VIEW", slotId, placement, pagePath, dedupeKey: `v:${slotId}:${tag}:${swapId}:${visitorHash}:${dayKey}`, createdAt: at });
 
         if (random() < 0.04) {
           const clickId = randomBytes(10).toString("hex");
-          events.push({ ...base, type: "CLICK", slotId, clickId, createdAt: at });
+          events.push({ ...base, type: "CLICK", slotId, placement, pagePath, clickId, createdAt: at });
           if (random() < 0.2) {
             events.push({
               ...base,

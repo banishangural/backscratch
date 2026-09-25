@@ -1,13 +1,14 @@
-import { LIVE_WINDOW_HOURS } from "@/config/widget";
+import { LIVE_WINDOW_HOURS, MIN_BAND_PAGES } from "@/config/widget";
 import type { GoLiveChecks } from "@/lib/widget/go-live";
 
-// The three conditions a product needs to appear in the marketplace.
+// The conditions a product needs to appear in the marketplace.
 export function GoLiveChecklist({ checks, domain }: { checks: GoLiveChecks; domain: string }) {
-  const live = checks.approved && checks.verified && checks.widgetSeen;
+  const live = checks.approved && checks.verified && checks.bandSpread;
   const items = [
     { ok: checks.approved, label: "Approved by an admin" },
     { ok: checks.verified, label: `Domain ${domain} verified` },
-    { ok: checks.widgetSeen, label: `Widget loaded on ${domain} in the last ${LIVE_WINDOW_HOURS} hours` },
+    { ok: checks.bandSeen, label: `Footer band loaded on ${domain} in the last ${LIVE_WINDOW_HOURS} hours` },
+    { ok: checks.bandSpread, label: `…on at least ${MIN_BAND_PAGES} different pages (so it's in your site-wide layout)` },
   ];
 
   return (

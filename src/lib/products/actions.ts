@@ -71,6 +71,7 @@ export async function createProduct(_prev: FormState, formData: FormData): Promi
       ...productData(parsed.data),
       ownerId: user.id,
       verification: { create: { token: newVerificationToken() } },
+      slot: { create: {} }, // the product's one widget install
     },
   });
   redirect(`/products/${product.id}`);

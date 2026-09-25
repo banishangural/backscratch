@@ -28,7 +28,7 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/api/widget/[
   return config ? Response.json(config, { headers: { ...CORS_HEADERS, ...CACHED } }) : notFound();
 }
 
-// Unknown or archived slots: the widget renders nothing. Cached too, so a stale
+// Unknown slots (e.g. extra placements removed in Phase 2.1): the widget renders nothing. Cached too, so a stale
 // snippet on a busy page doesn't hit the database on every load.
 function notFound() {
   return new Response(null, { status: 404, headers: { ...CORS_HEADERS, ...CACHED } });
