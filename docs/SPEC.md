@@ -22,10 +22,11 @@ I'm a solo developer comfortable with HTML, CSS, JavaScript, Node.js, and SQL. W
 - User
 - Product: name, URL, domain, logo, one-line pitch, category, audience description, status (draft/pending/approved/rejected/suspended, with a reason shown to the founder; a rejected product can be edited and resubmitted), visibility settings for each metric
 - DomainVerification: method (meta tag or DNS TXT), token, verified_at
-- Slot: a placement of the widget on a product's site (e.g. "thank-you page", "dashboard sidebar"), with last_seen_at for heartbeat. Widget only; there are no tracked links.
+- Slot: the product's single widget placement, a full-width band directly above the site footer on every page (created automatically, one per product), with last_seen_at for heartbeat and the host and page path it was last seen on. Widget only; there are no tracked links.
 - Swap: product_a, product_b, status (requested/active/paused/ended/declined), request message, start date, end date (default 30 days), renewal state
-- Event: type (view/click/conversion), swap, slot, source product, destination product, timestamp, daily-salted visitor hash (never raw IP)
-- MetricSnapshot: verified revenue range, active subscriptions, customer count, traffic, source (stripe/trustmrr/ga4/plausible/umami), fetched_at
+- Event: type (view/click/conversion), swap, slot, source product, destination product, page path (views and clicks), timestamp, daily-salted visitor hash (never raw IP)
+- MetricSnapshot: verified revenue range, active subscriptions, customer count, source (stripe/trustmrr), fetched_at
+- PageViewSnapshot: daily verified page views and visitors per product (and per page path where the provider supports it), source (ga4/plausible/umami), fetched_at
 - Report: reporter, reported product, reason, status
 
 ## Phases
@@ -40,6 +41,7 @@ Project scaffold, Prisma schema, env config, seed script with a few fake product
 - Admin approval queue (admin determined by an ADMIN_EMAILS env var): approve, reject with reason, suspend. Founders see their status and any rejection reason.
 
 ### Phase 2: The widget and tracked links
+- One placement per product: a full-width "Tools we recommend" band directly above the site footer, on every page of the public website (see Phase 2.1; the first build allowed free-named placements).
 - One script tag install: <script src=".../w.js" data-slot="SLOT_ID" async></script>
 - The widget heading is always "Tools we recommend". Founders cannot change it; only the app owner can, via one app-wide config value.
 - Renders up to 3 partner product cards (logo, name, one-line pitch) inside a Shadow DOM so host CSS can't break it. Light/dark/auto themes, and a compact and a card layout. It must look clean and native, never like a banner ad. Include a tiny "via [APP_NAME]" link.
@@ -48,12 +50,23 @@ Project scaffold, Prisma schema, env config, seed script with a few fake product
 - Clicks go through a redirect endpoint (/r/...) that records the click and forwards to the destination with UTM parameters (utm_source=[APP_NAME], utm_medium=swap, utm_campaign=<swap id>) plus a click ID parameter.
 - Heartbeat: every widget load updates the slot's last_seen_at.
 - Before any swaps exist, the widget shows a preview state visible only to the owner (e.g. via a query param or when logged in) so they can check placement and styling.
-- Every product must install the widget to go live. A product appears in the marketplace only when: (1) it is admin-approved and its domain is verified, (2) its widget has loaded on its real site within the last 72 hours, and (3) from Phase 6 on, it has at least one verified integration (GA4, Plausible, Umami, Stripe, or TrustMRR), optionally with a minimum monthly visitor count (MARKETPLACE_MIN_MONTHLY_VISITORS).
+- Every product must install the widget to go live. A product appears in the marketplace only when: (1) it is admin-approved and its domain is verified, (2) its widget has loaded on its real site within the last 72 hours, and (3) from Phase 3 on, it has a connected traffic integration (GA4, Plausible, or Umami), optionally with a minimum monthly visitor count (MARKETPLACE_MIN_MONTHLY_VISITORS).
 - Basic bot filtering: ignore known bot user agents, rate-limit event endpoints, and dedupe rapid repeated clicks.
 
+### Phase 2.1: Placement rework
+Aligns the Phase 2 code with the single fixed placement.
+- Exactly one placement per product, created automatically: a full-width band directly above the site footer, on every page. Founders can't add, rename, or remove placements; they still choose theme and layout.
+- A band-friendly "row" layout (cards side by side in one line, wrapping on small screens), next to the card and compact layouts.
+- Install instructions: paste the script tag above the footer in the site-wide layout/template, so it appears on every page.
+- Record the page path on every view and click. Store the path only: no query string or fragment, and number/ID-like segments replaced with ":id" (e.g. "/invoices/:id"). Show the founder a path breakdown (e.g. "/blog 70%, / 20%, /pricing 10%"); partners see it from Phase 3.
+- Go-live check: the band must have been seen within 72 hours on several distinct pages (a signal it's in the site-wide layout, not on one hidden page).
+
 ### Phase 3: Marketplace
-- Browse approved, live products with filters: category, audience keywords, revenue range, monthly slot views, click rate.
-- Product profile pages showing only the metrics the founder chose to make public, each labeled with its source ("verified via Stripe", "measured by [APP_NAME]").
+- Traffic verification first (moved here from Phase 6): when listing, founders connect GA4 (Google Analytics Data API, OAuth, read-only), or Plausible (Stats API key) or Umami (API) as alternatives. Check whether DataFast offers a public API; if it does, add it, and if not, tell me. Read each provider's official docs before implementing. Credentials encrypted at rest, never logged, never sent to the client. Refresh daily into PageViewSnapshot. Disconnecting deletes the stored credentials and snapshots.
+- A connected traffic integration is required to go live (listing rule condition 3), plus MARKETPLACE_MIN_MONTHLY_VISITORS if set. The go-live checklist shows it.
+- Browse approved, live products with filters: category, audience keywords, revenue range, verified monthly traffic, click rate.
+- Product cards and profiles show verified monthly site traffic, verified page views for the pages where the band appears (site-wide, so the site's total page views), and where the band actually loads (page path breakdown).
+- Product profile pages showing only the metrics the founder chose to make public, each labeled with its source ("verified via GA4", "verified via Stripe", "measured by [APP_NAME]").
 - "Suggested matches": simple rules for now, based on complementary categories (define a category complement map I can edit) and excluding direct competitors (same category). Keep it easy to swap in smarter matching later.
 
 ### Phase 4: Swap requests and lifecycle
@@ -65,20 +78,23 @@ Project scaffold, Prisma schema, env config, seed script with a few fake product
 - Heartbeat rule: if a partner's slot hasn't been seen for 72 hours, pause the swap automatically and email both founders.
 
 ### Phase 5: Balance dashboard and conversions
-- Per swap: views, clicks, click rate, and conversions sent in each direction, with a simple chart over time and an at-a-glance "balance" indicator.
+- Per swap: clicks and conversions sent in each direction are the headline fairness numbers, and the at-a-glance "balance" indicator is based on them. Views, click rate, and page paths are shown as secondary detail. Include a simple chart over time.
+- View check: daily, compare our widget views with the verified analytics page views for the same pages. Our views should be lower (only visitors who scroll down to the band count). If ours are clearly higher (e.g. over 1.3x across 7 days, above a minimum volume), flag the swap.
+- Click check: compare our click count with the visits the receiving product's analytics reports for utm_campaign=<swap id>, and flag large gaps.
+- Flags show both founders on the swap a neutral "these numbers don't line up" note; admins see the details (Phase 7).
 - Per product: total traffic received from all swaps, and which swaps perform best.
 - Optional conversion tracking: a tiny snippet the receiving product installs. On landing, it reads the click ID from the URL and stores it in first-party localStorage; when the founder calls a signup/conversion function, it reports the conversion with that click ID. Document this clearly.
 - Weekly email report per founder (scheduled job).
 
-### Phase 6: Verified metrics integrations
+### Phase 6: Verified revenue integrations
 - Stripe: the founder creates a restricted, read-only key (give them step-by-step instructions listing exactly which read permissions are needed). Encrypt keys at rest; never log them; never send them to the client. Compute active subscriptions, customer count, and an approximate MRR (normalize intervals to monthly, exclude trials, account for discounts), and store it as a range band, not an exact number, unless the founder opts in to exact.
 - TrustMRR: a founder can paste their TrustMRR profile URL to import verified metrics. Read TrustMRR's official API docs before implementing; do not guess endpoints. If an API key is required, stop and tell me.
-- Traffic: GA4 Data API (OAuth), Plausible Stats API, and Umami API. Check whether DataFast offers a public API; if it does, add it, and if not, tell me.
-- Refresh verified metrics on a daily schedule. Founders can disconnect any integration, which deletes the stored credentials and snapshots.
+- Traffic integrations (GA4, Plausible, Umami, DataFast) moved to Phase 3.
+- Refresh verified revenue metrics on a daily schedule. Founders can disconnect any integration, which deletes the stored credentials and snapshots.
 
 ### Phase 7: Trust, safety, and launch readiness
 - "Report this product" flow and admin review.
-- Admin dashboard: products, swaps, reports, suspicious traffic patterns (e.g. click rates far above normal).
+- Admin dashboard: products, swaps, reports, suspicious traffic patterns (e.g. click rates far above normal), and view/click mismatch flags from Phase 5 with the numbers behind them.
 - Rate limiting on all API routes, audit of ownership checks on every mutation, and security review of credential handling.
 - Terms of service and privacy policy placeholder pages explaining what data we collect and how credentials are handled.
 - Empty states, error states, loading states, and a 404 page.
@@ -100,8 +116,8 @@ Project scaffold, Prisma schema, env config, seed script with a few fake product
 
 ## Decisions log
 - Phase 0: widget heading fixed to "Tools we recommend" (app-wide, not founder-editable).
-- Phase 0: tracked links removed; the widget is the only placement and is required to go live.
-- Phase 0: marketplace listing rule = approved + verified domain + widget seen within 72h (+ verified integration from Phase 6).
+- Phase 0: tracked links removed; the widget is the only placement and is required to go live. (Refined after Phase 2: one fixed placement, see below.)
+- Phase 0: marketplace listing rule = approved + verified domain + widget seen within 72h (+ verified integration from Phase 6). (Changed after Phase 2: the integration requirement is a traffic integration, from Phase 3.)
 - Phase 0: added REJECTED (and DRAFT) product status with a reason; founders can resubmit.
 - Phase 0: users may own several products; each product has exactly one owner.
 - Phase 0: 14-day cooldown before re-requesting a declined swap.
@@ -122,3 +138,11 @@ Project scaffold, Prisma schema, env config, seed script with a few fake product
 - Phase 2: widget endpoints use the existing Postgres-backed rate limiter; revisit (e.g. Redis) only if traffic needs it.
 - Phase 2: views are deduped per visitor, slot, swap, and day (one VIEW row per swap shown). A product with more than 3 active swaps shows a random 3 per 60-second cache window.
 - Phase 2: `Slot.lastSeenHost` added (host of the last counted widget load, shown to the founder).
+- After Phase 2: one fixed placement per product, a full-width "Tools we recommend" band directly above the site footer on every page, created automatically. Replaces the free-named placements built in Phase 2. Chosen because every product has a public footer, founders accept it, it looks native, and it makes swaps directly comparable. A two-placement idea (footer + after-signup page) was dropped: after-signup pages differ between products, often sit behind a login, and can't be verified. More visible spots (floating badge, top bar) were rejected as too ad-like.
+- After Phase 2: views and clicks record the page path (path only; no query string or fragment; ID-like segments become ":id"). The path breakdown is shown to the founder and to partners.
+- After Phase 2: traffic verification (GA4, or Plausible/Umami) moves from Phase 6 to Phase 3 and is required to go live. The marketplace shows verified site traffic and verified page views for the band's pages. Phase 6 keeps Stripe and TrustMRR.
+- After Phase 2: our widget views are compared with analytics page views for the same pages, and our clicks with the partner's analytics visits for utm_campaign=<swap id>. Mismatches are flagged: a neutral note to both founders, details to admins.
+- After Phase 2: clicks and conversions are the headline fairness numbers on the balance dashboard; views are secondary.
+- After Phase 2: new Phase 2.1 (placement rework) comes before Phase 3.
+- Open (confirm at the start of Phase 3): GA4 needs the `analytics.readonly` OAuth scope; Google likely requires app verification before public users can connect, and a Google Cloud project is needed.
+- Known limit: we can't technically force the band to sit above the footer; the several-distinct-pages check, the owner preview, and admin review cover it.
