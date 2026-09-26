@@ -15,6 +15,7 @@ import { requireUser } from "@/lib/session";
 import { metaTagFor, txtRecordFor } from "@/lib/verification";
 import { goLiveChecks, recentBandPages } from "@/lib/widget/go-live";
 import { viewPathBreakdown } from "@/lib/widget/path-stats";
+import { badgePartnerCounts } from "@/lib/widget/placements";
 
 const STATUS_HELP: Record<ProductStatus, string> = {
   DRAFT: "Verify your domain, then submit your product for review.",
@@ -42,7 +43,11 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
     !verified &&
     (await db.product.count({ where: { verifiedDomain: product.domain, id: { not: product.id } } })) > 0;
   const canSubmit = product.status === "DRAFT" || product.status === "REJECTED";
-  const [bandPages, breakdown] = await Promise.all([recentBandPages(product.slot.id), viewPathBreakdown(product.id)]);
+  const [bandPages, breakdown, badgePartners] = await Promise.all([
+    recentBandPages(product.slot.id),
+    viewPathBreakdown(product.id),
+    badgePartnerCounts(product.id),
+  ]);
   const category = CATEGORIES.find((c) => c.key === product.category)?.label ?? product.category;
 
   return (
@@ -84,7 +89,7 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
       </Section>
 
       <Section title="Widget">
-        <WidgetPanel product={product} slot={product.slot} bandPages={bandPages} appUrl={env.APP_URL.replace(/\/$/, "")} />
+        <WidgetPanel product={product} slot={product.slot} bandPages={bandPages} badgePartners={badgePartners} appUrl={env.APP_URL.replace(/\/$/, "")} />
       </Section>
 
       <Section title="Where your widget is seen">

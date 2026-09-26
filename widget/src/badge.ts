@@ -40,21 +40,33 @@ function pick(cards: Card[], slot: string) {
   return cards[index % cards.length];
 }
 
-// Is a fixed or sticky host element under this node? Checks a 3×3 grid of points inset from
-// the edges (rounded shapes like chat bubbles don't reach their bounding box corners).
-function blocked(node: HTMLElement, host: HTMLElement) {
+// Is one of the host's own floating elements (chat button, cookie bar, bottom nav) under this
+// node? Returns it, or null. Checks a 3×3 grid of points inset from the edges (rounded shapes
+// like chat bubbles don't reach their bounding box corners).
+function blocker(node: HTMLElement, host: HTMLElement) {
   const r = node.getBoundingClientRect();
-  if (!r.width) return false;
+  if (!r.width) return null;
   const inset = Math.min(10, r.width / 4, r.height / 4);
   for (const x of [r.left + inset, (r.left + r.right) / 2, r.right - inset]) {
     for (const y of [r.top + inset, (r.top + r.bottom) / 2, r.bottom - inset]) {
       for (const found of document.elementsFromPoint(x, y)) {
-        if (found === host || found === document.body || found === document.documentElement) continue;
-        if (/fixed|sticky/.test(getComputedStyle(found).position)) return true;
+        if (found !== host && floating(found)) return found;
       }
     }
   }
-  return false;
+  return null;
+}
+
+// Fixed or sticky, visible, clickable, and smaller than the page. Page-sized fixed layers
+// (backgrounds, layout wrappers, click-through overlays) don't count: they'd hide the badge
+// on every page.
+function floating(found: Element) {
+  if (found === document.body || found === document.documentElement) return false;
+  const style = getComputedStyle(found);
+  if (!/fixed|sticky/.test(style.position)) return false;
+  if (style.pointerEvents === "none" || style.visibility === "hidden" || style.opacity === "0") return false;
+  const r = found.getBoundingClientRect();
+  return !(r.width >= innerWidth / 2 && r.height >= innerHeight / 2);
 }
 
 export function mountBadge(ctx: Ctx, api: string, slot: string, band: HTMLElement | null) {
@@ -108,8 +120,13 @@ export function mountBadge(ctx: Ctx, api: string, slot: string, band: HTMLElemen
     }
     host.style.display = "block";
     show(open);
-    if (open && blocked(box, host)) show(false);
-    if (!tab.hidden && blocked(tab, host)) host.style.display = "none";
+    const overBox = open && blocker(box, host);
+    if (overBox) show(false);
+    const overTab = !tab.hidden && blocker(tab, host);
+    if (overTab) host.style.display = "none";
+    // The owner preview says why the badge stepped aside (visitors never see this).
+    const reason = overTab || overBox;
+    if (config.pv && reason) console.info("Backscratch: the corner badge is making room for", reason);
   };
 
   minimize.onclick = () => {

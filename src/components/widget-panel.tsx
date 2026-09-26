@@ -19,12 +19,13 @@ type Props = {
   product: { id: string; url: string; domain: string; offersBadge: boolean; badgeCorner: string };
   slot: Slot;
   bandPages: { path: string }[]; // distinct pages within the live window
+  badgePartners: { active: number; onBadge: number }; // active swap partners, and those the badge can show
   appUrl: string;
 };
 
 // The product's one widget install: code, settings, where each placement was last seen,
 // warnings, and preview links.
-export function WidgetPanel({ product, slot, bandPages, appUrl }: Props) {
+export function WidgetPanel({ product, slot, bandPages, badgePartners, appUrl }: Props) {
   const since = liveSince();
   const badgeStale = product.offersBadge && !(slot.badgeLastSeenAt && slot.badgeLastSeenAt >= since);
   const token = createPreviewToken(slot.id);
@@ -57,6 +58,7 @@ export function WidgetPanel({ product, slot, bandPages, appUrl }: Props) {
         <li>
           <span className="font-medium">Corner badge:</span>{" "}
           {product.offersBadge ? lastSeen(slot.badgeLastSeenAt, slot.badgeLastSeenHost) : "not offered"}
+          {product.offersBadge && <span className="text-zinc-500"> · {badgeReach(badgePartners)}</span>}
         </li>
       </ul>
 
@@ -86,6 +88,14 @@ export function WidgetPanel({ product, slot, bandPages, appUrl }: Props) {
 function lastSeen(at: Date | null, host: string | null) {
   if (!at) return "not seen on your site yet";
   return `last seen ${timeAgo(at)} on ${host ?? "your site"}`;
+}
+
+// Why a badge may show nothing: it only shows partners who offer the badge too.
+function badgeReach({ active, onBadge }: { active: number; onBadge: number }) {
+  if (active === 0) return "shows partners once you have active swaps";
+  if (onBadge === 0) return `none of your ${active} partner${active === 1 ? "" : "s"} offer${active === 1 ? "s" : ""} the badge (or it hasn't loaded on their site in ${LIVE_WINDOW_HOURS} h), so it shows nothing yet`;
+  if (onBadge === active) return `shows your ${active === 1 ? "partner" : `${active} partners`}, one per page view`;
+  return `shows ${onBadge} of your ${active} partners (the others don't offer the badge)`;
 }
 
 function Warning({ children }: { children: React.ReactNode }) {

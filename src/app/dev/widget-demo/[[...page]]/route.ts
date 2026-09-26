@@ -42,9 +42,12 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/dev/widget-d
   a { text-decoration: underline wavy; }
   .spacer{height:120vh;border:2px dashed #ccc;display:flex;align-items:center;justify-content:center}
   footer{background:#eee;padding:24px;margin-top:0}
+  /* A page-sized fixed background, as many real sites have: the badge must still show. */
+  .bg{position:fixed;inset:0;z-index:-1;background:linear-gradient(#fdfcff,#f3f0ff)}
   .chat{position:fixed;right:16px;bottom:16px;width:56px;height:56px;border-radius:50%;background:#2563eb;border:0}
 </style></head>
 <body>
+  <div class="bg"></div>
   <h1>Pretend founder site: /${escape(page.join("/"))}</h1>
   <p>Pages: ${nav}</p>
   <p>Pick a product. Scroll down to the band and keep it on screen for a second to count a view.

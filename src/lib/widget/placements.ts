@@ -1,4 +1,5 @@
 import "server-only";
+import { db } from "@/lib/db";
 import type { Prisma } from "@/generated/prisma/client";
 import type { Placement } from "@/generated/prisma/enums";
 import { liveSince } from "@/lib/widget/go-live";
@@ -28,4 +29,19 @@ export const badgeSelect = { offersBadge: true, slot: { select: { badgeLastSeenA
 export function swapPlacements(a: BadgeFields, b: BadgeFields): Placement[] {
   const since = liveSince();
   return badgeLive(a, since) && badgeLive(b, since) ? ["BAND", "BADGE"] : ["BAND"];
+}
+
+// For the founder: how many active swaps there are, and how many of those partners the badge
+// can show right now (the partner offers the badge and it loaded within the live window).
+export async function badgePartnerCounts(productId: string) {
+  const partner = { select: { status: true, ...badgeSelect } };
+  const swaps = await db.swap.findMany({
+    where: { status: "ACTIVE", OR: [{ productAId: productId }, { productBId: productId }] },
+    select: { productAId: true, productA: partner, productB: partner },
+  });
+  const partners = swaps
+    .map((swap) => (swap.productAId === productId ? swap.productB : swap.productA))
+    .filter((other) => other.status === "APPROVED");
+  const since = liveSince();
+  return { active: partners.length, onBadge: partners.filter((other) => badgeLive(other, since)).length };
 }
