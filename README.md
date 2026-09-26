@@ -118,6 +118,9 @@ active swaps. See [widget/README.md](widget/README.md) for how it works.
 2. Open http://localhost:3000/dev/widget-demo (development only). It's a small "founder site" with
    hostile CSS and several pages. Invoicely and MailPilot show each other (the seeded active swap) in
    the band and the badge (both offer it); other products render nothing.
+   The widget on this page has `data-debug`, so it explains in the browser console what it received
+   and why the badge is showing, minimized, or hidden. Add `data-debug` to any install tag to do the
+   same on a real site. (The owner preview always does.)
 3. Wait 3 seconds for the badge, scroll to the band and keep it visible for a second, then click a card.
    Check the new `VIEW` and `CLICK` rows (with `placement` and `pagePath`) in `npm run db:studio`.
    Automated browsers (Playwright etc.) aren't counted.

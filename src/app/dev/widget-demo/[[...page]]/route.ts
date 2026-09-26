@@ -50,12 +50,12 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/dev/widget-d
   <div class="bg"></div>
   <h1>Pretend founder site: /${escape(page.join("/"))}</h1>
   <p>Pages: ${nav}</p>
-  <p>Pick a product. Scroll down to the band and keep it on screen for a second to count a view.
+  <p>The widget explains what it's doing in the browser console (data-debug). Pick a product. Scroll down to the band and keep it on screen for a second to count a view.
   The corner badge appears after 3 seconds or a little scrolling if the product offers it.
   <a href="${query({ chat: chat ? "0" : "1" })}">${chat ? "Remove" : "Add"} a fixed chat button</a>.</p>
   <ul>${products}</ul>
   <div class="spacer">Scroll down ↓</div>
-  <script src="/w.js" data-slot="${escape(selected)}" async></script>
+  <script src="/w.js" data-slot="${escape(selected)}" data-debug async></script>
   <footer>Site footer · © Pretend founder</footer>
   ${chat ? '<button class="chat" aria-label="Chat"></button>' : ""}
 </body></html>`;

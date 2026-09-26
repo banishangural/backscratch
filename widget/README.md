@@ -12,6 +12,9 @@ Founders paste it once above the footer in their site-wide layout. It renders th
 after the tag (or inside `<div data-backscratch="SLOT_ID">`) and, if the product offers it, the
 corner badge (fixed to the bottom-left or bottom-right of the viewport).
 
+Add `data-debug` to the tag to have the widget explain in the browser console what it received and
+why the badge is showing, minimized, or hidden. The owner preview does this automatically.
+
 ## Files
 
 - `src/index.ts`: finds `script[data-slot]` tags and `[data-backscratch]` containers, fetches the

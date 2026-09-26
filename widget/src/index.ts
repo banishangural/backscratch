@@ -42,11 +42,15 @@ async function fetchConfig(url: string): Promise<Config | null> {
 
 let badgeMounted = false; // one badge per page, even if the script is included twice
 
-async function mount(slot: string, api: string, place: (host: HTMLElement) => void, token: string | null) {
-  if (!/^[a-z0-9]{20,32}$/.test(slot)) return;
+async function mount(slot: string, api: string, place: (host: HTMLElement) => void, node: Element) {
+  // data-debug on the tag (or the owner preview) explains in the console what the widget does.
+  const token = previewToken(node);
+  const log = token || node.hasAttribute("data-debug") ? console.info.bind(console, "Backscratch:") : () => {};
+  if (!/^[a-z0-9]{20,32}$/.test(slot)) return log("invalid slot id", slot);
   const base = `${api}/api/widget/${slot}`;
   const config = await fetchConfig(token ? `${base}?preview=${encodeURIComponent(token)}` : base);
-  if (!config) return;
+  if (!config) return log("no config (unknown slot, or our API is unreachable)");
+  log(`${config.c.length} band partner(s);`, config.b ? `badge offered, ${config.b.c.length} badge partner(s)` : "badge not offered");
 
   const h = location.hostname;
   const p = normalizePath(location.pathname);
@@ -57,6 +61,7 @@ async function mount(slot: string, api: string, place: (host: HTMLElement) => vo
     config,
     href: (card, pl) => (config.pv ? null : `${api}/r/${card.s}/${slot}?pl=${pl}&p=${encodeURIComponent(p)}`),
     view: (s, pl) => send(`${base}/view`, { s, pl, p, h }),
+    log,
   };
 
   let band: HTMLElement | null = null;
@@ -77,8 +82,8 @@ const self = document.currentScript as HTMLScriptElement | null;
 
 function init() {
   const api = new URL(self?.src || location.href).origin;
-  const start = (slot: string, place: (host: HTMLElement) => void, token: string | null) =>
-    mount(slot, api, place, token).catch(() => {});
+  const start = (slot: string, place: (host: HTMLElement) => void, node: Element) =>
+    mount(slot, api, place, node).catch(() => {});
 
   // Explicit containers first: <div data-backscratch="SLOT_ID"></div>
   const claimed = new Set<string>();
@@ -86,7 +91,7 @@ function init() {
     container.setAttribute(DONE, "");
     const slot = container.getAttribute("data-backscratch") || "";
     claimed.add(slot);
-    start(slot, (host) => container.append(host), previewToken(container));
+    start(slot, (host) => container.append(host), container);
   }
 
   // Otherwise render right after the script tag (or at the end of <body> if it's in <head>).
@@ -95,7 +100,7 @@ function init() {
     const slot = script.getAttribute("data-slot") || "";
     if (claimed.has(slot)) continue;
     const inHead = script.parentElement === document.head;
-    start(slot, (host) => (inHead ? document.body.append(host) : script.after(host)), previewToken(script));
+    start(slot, (host) => (inHead ? document.body.append(host) : script.after(host)), script);
   }
 }
 

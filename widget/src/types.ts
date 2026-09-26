@@ -17,4 +17,6 @@ export type Ctx = {
   href: (card: Card, placement: "band" | "badge") => string | null;
   // Reports a viewable impression of these swaps in this placement.
   view: (swapIds: string[], placement: "band" | "badge") => void;
+  // Console notes for the owner preview and data-debug; does nothing otherwise.
+  log: (...args: unknown[]) => void;
 };

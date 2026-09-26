@@ -8,7 +8,14 @@ const nextConfig: NextConfig = {
         // Vercel's CDN for a day (each deploy starts with a fresh CDN cache).
         source: "/w.js",
         headers: [
-          { key: "Cache-Control", value: "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800" },
+          {
+            key: "Cache-Control",
+            // In development, never cache it, so a rebuilt widget shows up on the next reload.
+            value:
+              process.env.NODE_ENV === "development"
+                ? "no-store"
+                : "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800",
+          },
           { key: "Access-Control-Allow-Origin", value: "*" },
         ],
       },

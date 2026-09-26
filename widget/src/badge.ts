@@ -115,6 +115,7 @@ export function mountBadge(ctx: Ctx, api: string, slot: string, band: HTMLElemen
   };
   const update = () => {
     if (!ready || bandOnScreen) {
+      if (ready && host.style.display !== "none") ctx.log("badge hidden while the band is on screen");
       host.style.display = "none";
       return;
     }
@@ -126,7 +127,7 @@ export function mountBadge(ctx: Ctx, api: string, slot: string, band: HTMLElemen
     if (overTab) host.style.display = "none";
     // The owner preview says why the badge stepped aside (visitors never see this).
     const reason = overTab || overBox;
-    if (config.pv && reason) console.info("Backscratch: the corner badge is making room for", reason);
+    if (reason) ctx.log(`badge ${overTab ? "hidden" : "minimized"} to make room for`, reason);
   };
 
   minimize.onclick = () => {
@@ -142,6 +143,7 @@ export function mountBadge(ctx: Ctx, api: string, slot: string, band: HTMLElemen
 
   // Appear after a short delay or a little scrolling, whichever comes first.
   const reveal = () => {
+    if (!ready) ctx.log(`badge showing ${card.n} in the bottom-${side} corner${open ? "" : " (as a tab: minimized or phone)"}`);
     ready = true;
     update();
   };
